@@ -1,0 +1,8 @@
+/target
+*.jpeg
+*.jpg
+*.png
+*.mkv
+*.mp4
+*.mov
+/.env
