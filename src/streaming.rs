@@ -76,9 +76,12 @@ pub mod network {
       W: async_std::io::Write + std::marker::Unpin,
     {
       let mut rgb_decoder = jpeg_decoder::Decoder::new(io::Cursor::new(&frame.data));
-      let rgb_data = rgb_decoder
-        .decode()
-        .with_context(|| "unable to extract raw rgb data from input")?;
+      let rgb_data = rgb_decoder.decode().with_context(|| {
+        format!(
+          "unable to extract raw rgb data from input of {} bytes",
+          frame.len()
+        )
+      })?;
 
       let rgb = openh264::formats::RgbSliceU8::new(
         &rgb_data,
@@ -120,7 +123,7 @@ pub mod network {
       }
 
       if self.current_cluster_start.is_none() {
-        log::info!("we have started a new cluster");
+        log::trace!("we have started a new cluster");
         self.current_cluster_start = Some(frame.timestamp);
       }
 
@@ -138,7 +141,7 @@ pub mod network {
 
       if self.written_frames > MAX_BUFFERED_FRAMES {
         self.current_cluster_start = None;
-        log::info!("flushing our current frames into the destination");
+        log::debug!("flushing our current frames into the destination");
         self.mkv_cursor.dump_to(destination).await?;
         self.written_frames = 0;
       }
@@ -198,7 +201,7 @@ pub mod network {
 
     req.extend_from_slice(b"\r\n");
 
-    log::debug!(
+    log::trace!(
       "writing http request for putmedia:\n{}",
       std::str::from_utf8(&req).unwrap()
     );
@@ -291,14 +294,19 @@ pub mod network {
           return Ok(());
         }
         Ok(NetworkFrame::ReceivedCommand(StreamControl::DataAvailable(frame))) => {
+          log::trace!(
+            "received an image from the camera thread with dimension = {:?}",
+            frame.dimensions
+          );
           // TODO(optimization) - here we are letting our encoder fill a buffer for us, which we
           // then manually write into the open tcp connection using a chunked transfer encoding.
-          let mut encoded_buffer = Vec::with_capacity((frame.dimensions.0 * frame.dimensions.1) as usize);
+          let mut encoded_buffer =
+            Vec::with_capacity(frame.dimensions.0 as usize * frame.dimensions.1 as usize);
 
           encoder.encode_to(&frame, &mut encoded_buffer).await?;
 
           if !encoded_buffer.is_empty() {
-            log::info!("encoder readied data, writing to connection now");
+            log::debug!("encoder readied data, writing to connection now");
 
             // see: <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding>
             let mut copied = Vec::with_capacity(encoded_buffer.len());

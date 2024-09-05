@@ -217,7 +217,7 @@ impl Cursor {
         matroska_spec::MatroskaSpec::Timestamp(cluster_timestamp),
       ];
 
-      log::info!("opening cluster tag (timestamp = {cluster_timestamp})",);
+      log::trace!("opening cluster tag (timestamp = {cluster_timestamp})",);
 
       for t in tags {
         self.write_tag(&t)?;
