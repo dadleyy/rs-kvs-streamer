@@ -1,0 +1,27 @@
+name: gh.build-and-test
+on: [push]
+jobs:
+  ubuntu_latest_build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: prepare-vars
+        run: |
+          echo "SHORT_SHA=$(echo $GITHUB_SHA | head -c 7)">>$GITHUB_OUTPUT
+          echo "RS_KVS_STREAMER_VERSION=$(echo $GITHUB_SHA | head -c 7)">>$GITHUB_ENV
+      - name: prepare dependencies
+        run: sudo apt install libclang-dev clang libopencv-dev cmake ninja-build -y
+      - name: install-stable
+        run: rustup toolchain install stable
+      - name: use-stable
+        run: rustup default stable
+      - name: add-clippy
+        run: rustup component add clippy
+      - name: clippy
+        run: cargo clippy
+      - name: build
+        run: |
+          echo "building $RS_KVS_STREAMER_VERSION"
+          cargo build
+      - name: test
+        run: cargo test
